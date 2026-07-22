@@ -1,0 +1,13 @@
+.DS_Store
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.ipa
+*.dSYM.zip
+*.dSYM
+.env
+.env.*
+!.env.example

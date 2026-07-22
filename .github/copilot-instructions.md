@@ -1,0 +1,1 @@
+Follow `AGENTS.md` for every change. Preserve the privacy invariants, keep CARINA and MAYA claims distinct, run `./Scripts/verify.sh`, and report only evidence produced by commands actually run. Do not add Full Access, networking, analytics, automatic sending, secrets, or generated Xcode artifacts.
