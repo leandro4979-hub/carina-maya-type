@@ -1,6 +1,14 @@
 import Foundation
 import SwiftUI
 
+private enum SnippetStoreError: LocalizedError {
+    case containerUnavailable
+
+    var errorDescription: String? {
+        "Shared storage is unavailable. Check the MAYA TYPE App Group capability."
+    }
+}
+
 @MainActor
 final class SnippetStore: ObservableObject {
     @Published private(set) var snippets: [Snippet] = []
@@ -80,9 +88,7 @@ final class SnippetStore: ObservableObject {
 
     private func persist(_ values: [Snippet]) throws {
         guard let url = SnippetStorage.fileURL(fileManager: fileManager) else {
-            throw CocoaError(.fileNoSuchFile, userInfo: [
-                NSLocalizedDescriptionKey: "Shared storage is unavailable. Check the MAYA TYPE App Group capability."
-            ])
+            throw SnippetStoreError.containerUnavailable
         }
 
         let data = try encoder.encode(values)
