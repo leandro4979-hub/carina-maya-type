@@ -4,6 +4,12 @@ final class KeyboardViewController: UIInputViewController {
     private enum Layout { case letters, symbols }
     private enum Tone: String { case professional = "Professional", casual = "Casual" }
 
+    private struct Suggestion {
+        let label: String
+        let text: String
+        let triggerToReplace: String?
+    }
+
     private var layout: Layout = .letters
     private var isShifted = true
     private var tone: Tone = .professional
@@ -12,6 +18,9 @@ final class KeyboardViewController: UIInputViewController {
     private var lastInsertedText = ""
     private var rootStack: UIStackView?
     private var suggestionButtons: [UIButton] = []
+    private let snippetReader = SnippetReader()
+    private var snippets: [Snippet] = []
+    private var snippetFileModificationDate: Date?
 
     private let letterRows: [[String]] = [
         ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -27,6 +36,13 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = palette.background
+        refreshSnippetsIfNeeded(force: true)
+        rebuildInterface()
+    }
+
+    override func textDidChange(_ textInput: (any UITextInput)?) {
+        super.textDidChange(textInput)
+        refreshSnippetsIfNeeded()
         rebuildInterface()
     }
 
@@ -243,26 +259,78 @@ final class KeyboardViewController: UIInputViewController {
         layout == .letters && !isShifted ? character.lowercased() : character
     }
 
-    private func suggestionsForCurrentDraft() -> [(label: String, text: String)] {
-        let draft = (textDocumentProxy.documentContextBeforeInput ?? "").lowercased()
+    private func suggestionsForCurrentDraft() -> [Suggestion] {
+        refreshSnippetsIfNeeded()
+
+        let context = textDocumentProxy.documentContextBeforeInput ?? ""
+        let snippetSuggestions = SnippetMatcher.matches(context: context, snippets: snippets).map { snippet in
+            Suggestion(label: snippet.shortcut, text: snippet.replacement, triggerToReplace: SnippetMatcher.activeTrigger(in: context))
+        }
+
+        let builtIns = builtInSuggestions(for: context.lowercased())
+        guard !snippetSuggestions.isEmpty else { return builtIns }
+
+        var combined = snippetSuggestions
+        for suggestion in builtIns where combined.count < 3 {
+            if !combined.contains(where: { $0.text == suggestion.text }) {
+                combined.append(suggestion)
+            }
+        }
+        return Array(combined.prefix(3))
+    }
+
+    private func builtInSuggestions(for draft: String) -> [Suggestion] {
+        func suggestion(_ label: String, _ text: String) -> Suggestion {
+            Suggestion(label: label, text: text, triggerToReplace: nil)
+        }
+
         if draft.contains("?") || draft.contains("can you") || draft.contains("could you") {
             return tone == .professional
-                ? [("CONFIRM", "Yes, that works for me."), ("CLARIFY", "Could you clarify the details?"), ("ACKNOWLEDGE", "Thank you. I will review this.")]
-                : [("YES", "Yes, that works for me."), ("ASK", "Can you share a little more?"), ("THANKS", "Thanks, I appreciate it.")]
+                ? [suggestion("CONFIRM", "Yes, that works for me."), suggestion("CLARIFY", "Could you clarify the details?"), suggestion("ACKNOWLEDGE", "Thank you. I will review this.")]
+                : [suggestion("YES", "Yes, that works for me."), suggestion("ASK", "Can you share a little more?"), suggestion("THANKS", "Thanks, I appreciate it.")]
         }
         if draft.contains("meeting") || draft.contains("schedule") || draft.contains("calendar") {
             return tone == .professional
-                ? [("SCHEDULE", "I am available to schedule a time."), ("CONFIRM", "That time works for me."), ("ALTERNATE", "Could we choose another time?")]
-                : [("SCHEDULE", "I can make time for that."), ("YES", "That works for me."), ("ANOTHER TIME", "Can we pick another time?")]
+                ? [suggestion("SCHEDULE", "I am available to schedule a time."), suggestion("CONFIRM", "That time works for me."), suggestion("ALTERNATE", "Could we choose another time?")]
+                : [suggestion("SCHEDULE", "I can make time for that."), suggestion("YES", "That works for me."), suggestion("ANOTHER TIME", "Can we pick another time?")]
         }
         if draft.count > 80 {
             return tone == .professional
-                ? [("POLISH", "Thank you for the update. I will follow up shortly."), ("SUMMARY", "Here is the key point: "), ("ACKNOWLEDGE", "Received. Thank you.")]
-                : [("POLISH", "Thanks for the update. I will follow up soon."), ("SUMMARY", "Quick summary: "), ("ACKNOWLEDGE", "Got it, thanks.")]
+                ? [suggestion("POLISH", "Thank you for the update. I will follow up shortly."), suggestion("SUMMARY", "Here is the key point: "), suggestion("ACKNOWLEDGE", "Received. Thank you.")]
+                : [suggestion("POLISH", "Thanks for the update. I will follow up soon."), suggestion("SUMMARY", "Quick summary: "), suggestion("ACKNOWLEDGE", "Got it, thanks.")]
         }
         return tone == .professional
-            ? [("REPLY", "Thank you. I will follow up shortly."), ("CLARIFY", "Could you clarify the details?"), ("ACKNOWLEDGE", "Received. Thank you.")]
-            : [("REPLY", "Thanks, I will follow up soon."), ("ASK", "Can you share a little more?"), ("ACKNOWLEDGE", "Got it, thanks.")]
+            ? [suggestion("REPLY", "Thank you. I will follow up shortly."), suggestion("CLARIFY", "Could you clarify the details?"), suggestion("ACKNOWLEDGE", "Received. Thank you.")]
+            : [suggestion("REPLY", "Thanks, I will follow up soon."), suggestion("ASK", "Can you share a little more?"), suggestion("ACKNOWLEDGE", "Got it, thanks.")]
+    }
+
+    private func refreshSnippetsIfNeeded(force: Bool = false) {
+        guard let url = SnippetStorage.fileURL() else {
+            snippets = []
+            snippetFileModificationDate = nil
+            return
+        }
+
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let modificationDate = attributes?[.modificationDate] as? Date
+
+        guard force || modificationDate != snippetFileModificationDate else { return }
+        snippets = snippetReader.load()
+        snippetFileModificationDate = modificationDate
+    }
+
+    private func applySuggestion(_ suggestion: Suggestion) {
+        if let trigger = suggestion.triggerToReplace {
+            let currentContext = textDocumentProxy.documentContextBeforeInput ?? ""
+            guard currentContext.hasSuffix(trigger) else {
+                rebuildInterface()
+                return
+            }
+            for _ in trigger {
+                textDocumentProxy.deleteBackward()
+            }
+        }
+        insertPreparedText(suggestion.text)
     }
 
     private func insertPreparedText(_ text: String) {
@@ -284,12 +352,12 @@ final class KeyboardViewController: UIInputViewController {
     @objc private func insertSuggestion(_ sender: UIButton) {
         let suggestions = suggestionsForCurrentDraft()
         guard suggestions.indices.contains(sender.tag) else { return }
-        insertPreparedText(suggestions[sender.tag].text)
+        applySuggestion(suggestions[sender.tag])
     }
 
     @objc private func acceptTopSuggestion(_ recognizer: UISwipeGestureRecognizer) {
         guard recognizer.state == .ended, let top = suggestionsForCurrentDraft().first else { return }
-        insertPreparedText(top.text)
+        applySuggestion(top)
     }
 
     @objc private func toggleTone() { tone = tone == .professional ? .casual : .professional; rebuildInterface() }
