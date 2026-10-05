@@ -40,7 +40,7 @@ final class KeyboardViewController: UIInputViewController {
         rebuildInterface()
     }
 
-    override func textDidChange(_ textInput: (any UITextInput)?) {
+    override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         refreshSnippetsIfNeeded()
         rebuildInterface()
