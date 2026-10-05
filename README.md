@@ -5,7 +5,7 @@ Two privacy-first iOS keyboard experiences built as native Swift projects.
 - **CARINA TYPE** uses Apple's on-device Foundation Models on iOS 26 or later for user-requested replies, rewrites, tone changes, shortening, and Spanish translation.
 - **MAYA TYPE** provides fast, deterministic suggestions selected from the text the user is currently drafting.
 
-Neither keyboard requests Full Access. Both prepare editable text through `textDocumentProxy`; neither sends messages or places calls.
+Neither keyboard requests Full Access. Both prepare editable text through `textDocumentProxy`; neither sends messages or places calls. MAYA's host app can save user-defined text snippets in its App Group container, and the keyboard reads that local data without writing to the shared container.
 
 ## What is real today
 
@@ -15,6 +15,7 @@ Neither keyboard requests Full Access. Both prepare editable text through `textD
 | Keyboard Full Access required | No | No |
 | On-device language-model generation | iOS 26+ with an available Apple system model | No |
 | Context-aware prepared replies | Model-generated | Deterministic rules |
+| User-defined text snippets | No | Yes, stored on-device and read by the keyboard |
 | User reviews text before insertion | Yes | Yes |
 | Voice screen | Apple Speech recognition and AVSpeechSynthesizer | Apple Speech recognition |
 
