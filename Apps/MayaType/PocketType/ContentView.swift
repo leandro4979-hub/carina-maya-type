@@ -51,6 +51,22 @@ struct ContentView: View {
                     }
                     .suiteCard(accent: accent)
 
+                    NavigationLink {
+                        SnippetsView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Your snippets", systemImage: "text.badge.plus")
+                                .font(.headline)
+                            Text("Create private shortcuts like ;sig or ;addr. MAYA reads them on-device while Full Access stays off.")
+                                .foregroundStyle(.secondary)
+                            Label("Manage snippets", systemImage: "chevron.right")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(accent)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .suiteCard(accent: accent)
+
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Turn on the keyboard", systemImage: "keyboard")
                             .font(.headline)

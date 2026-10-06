@@ -7,6 +7,8 @@
 - No analytics or tracking SDK is included.
 - CARINA uses Apple's system language model when it is locally available.
 - MAYA uses deterministic local suggestion rules.
+- MAYA snippets are written by the containing app to its App Group container; with Full Access disabled, the keyboard uses that shared data only for local read-only suggestions.
+- No new networking, remote telemetry, or logging is introduced for snippets.
 - Prepared text is inserted only after a user action.
 - Neither app sends a message or places a call.
 
